@@ -1,0 +1,51 @@
+#!/bin/sh
+crond -L /var/log/crond.log
+echo $2 > /hart-file/email
+
+if [ -e /hart/keystore/* ]
+    then 
+        if [ $(echo $pswd | wc -c) -gt 1 ]
+            then
+            echo "FOUND keystore and FOUND pswd in environment variable"
+            echo $pswd > /hart-file/cred/pswd
+            geth --cache 512 --datadir=/hart init /hart-file/genesis.json
+            geth --networkid=1021 --datadir=/hart --nodiscover --port 30303 --mine --unlock 0 --password /hart-file/cred/pswd --allow-insecure-unlock --targetgaslimit 50000000000000 --miner.gasprice 0 --ethstats $1:$netstat-pswd@$netstat --bootnodes=$bootnode 2>&1 | tee /hart/sealer.log
+        else
+            if [ -e /hart-file/cred/pswd ]
+                then
+                echo "FOUND keystore and FOUND pswd in /hart-file/cred/pswd"
+                geth --cache 512 --datadir=/hart init /hart-file/genesis.json
+                geth --networkid=1021 --datadir=/hart --nodiscover --port 30303 --mine --unlock 0 --password /hart-file/cred/pswd --allow-insecure-unlock --targetgaslimit 50000000000000 --miner.gasprice 0 --ethstats $1:$netstat-pswd@$netstat --bootnodes=$bootnode 2>&1 | tee /hart/sealer.log
+            else
+                echo "NO pswd found everywhere, please set pswd on environment variable when run the container"
+            fi
+        fi
+else 
+    if [ $(echo $pswd | wc -c) -gt 1 ]
+        then
+        echo "NO keystore and FOUND pswd in environment variable"
+        echo $pswd > /hart-file/cred/pswd
+        geth --datadir=/hart account new --password /hart-file/cred/pswd
+        sleep 2
+        geth --cache 512 --datadir=/hart init /hart-file/genesis.json
+        geth --networkid=1021 --datadir=/hart --nodiscover --port 30303 --mine --unlock 0 --password /hart-file/cred/pswd --allow-insecure-unlock --targetgaslimit 50000000000000 --miner.gasprice 0 --ethstats $1:$netstat-pswd@$netstat --bootnodes=$bootnode 2>&1 | tee /hart/sealer.log
+    else
+        if [ -e /hart-file/cred/pswd ]
+            then
+            echo "NO keystore and FOUND pswd in /hart-file/cred/pswd"
+            geth --datadir=/hart account new --password /hart-file/cred/pswd
+            sleep 2
+            geth --cache 512 --datadir=/hart init /hart-file/genesis.json
+            geth --networkid=1021 --datadir=/hart --nodiscover --port 30303 --mine --unlock 0 --password /hart-file/cred/pswd --allow-insecure-unlock --targetgaslimit 50000000000000 --miner.gasprice 0 --ethstats $1:$netstat-pswd@$netstat --bootnodes=$bootnode 2>&1 | tee /hart/sealer.log
+        else
+            echo "NO keystore and pswd FOUND, generate ALL"
+            export pswd=$(gpg --gen-random --armor 1 128)
+            sleep 2s
+            echo $pswd > /hart-file/cred/pswd
+            geth --datadir=/hart account new --password /hart-file/cred/pswd
+            sleep 2
+            geth --cache 512 --datadir=/hart init /hart-file/genesis.json
+            geth --networkid=1021 --datadir=/hart --nodiscover --port 30303 --mine --unlock 0 --password /hart-file/cred/pswd --allow-insecure-unlock --targetgaslimit 50000000000000 --miner.gasprice 0 --ethstats $1:$netstat-pswd@$netstat --bootnodes=$bootnode 2>&1 | tee /hart/sealer.log
+        fi
+    fi
+fi

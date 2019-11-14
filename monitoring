@@ -1,0 +1,9 @@
+#!/bin/sh
+
+export addrtemp=$(geth --exec "eth.accounts" attach ipc:/hart/geth.ipc)
+export addr=${addrtemp:2:42}
+export lb=$(geth --exec "eth.blockNumber" attach ipc:/hart/geth.ipc)
+export lsb=$(grep 'Successfully sealed new block' /hart/sealer.log | tail -1 | awk '{print $7}' | cut -c 8-)
+sleep 5
+echo $("addr=$addr lb=$lb lsb=$lsb")
+curl -X GET $(MONITORING_API)?addr=$addr\&lb=$lb\&lsb=$lsb

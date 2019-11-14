@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# export account and email to variable
+export account=$(geth --exec "eth.accounts" attach ipc:/hart/geth.ipc | cut -c 3- | sed 's/.\{2\}$//')
+export email=$(cat /hart-file/email)
+
+# get list of authorized signers
+rm -rvf /home/signers
+geth --exec "clique.getSigners(console.log)" attach ipc:/hart/geth.ipc > /home/signers
+
+# check account on list of authorized signers
+if grep -c $account /home/signers > 0
+    then
+        echo $(date) "= account authorized" 2>&1 | tee /hart/auth-signer.log
+        
+        ## remove current static-nodes.json
+        rm -rvf /hart/geth/static-nodes.json
+        
+        ## recreate static-nodes.json and get new enode
+        echo "[" > /hart/geth/static-nodes.json
+        curl -H "Content-Type: text/plain" -X GET (STATIC_NODES_API)/ | tr "_" "\n" | tr "-" "\n" | grep enode >> /hart/geth/static-nodes.json
+        sed -i 's/enode/"enode/g' /hart/geth/static-nodes.json && sed -i 's/30303/30303",/g' /hart/geth/static-nodes.json
+        sed -i '$ s/,//' hart/geth/static-nodes.json
+        echo "]" >> /hart/geth/static-nodes.json
+
+        ## grep address & enode
+        sleep 30
+        enodetemp=$(grep 'enode' /hart/sealer.log | awk '{print $6}')
+        export enode=${enodetemp:5:137}$(curl ifconfig.co)":30303"
+        echo $account
+        echo $enode
+
+        ## post address & enode to dynamoDB
+        curl -H "Content-Type: text/plain" -d ___$enode--- -X POST (STATIC_NODES_API)$account
+        
+        ## post email to dynamoDB
+        echo $email
+        curl -H "Content-Type: text/plain" -d $email -X POST $(EMAIL_API)$account
+        
+        ## restart container
+        pkill geth
+    else
+        echo $(date) "= your account NOT authorize yet, try again after more than half authorized signers propose your account" 2>&1 | tee /hart/auth-signer.log
+fi

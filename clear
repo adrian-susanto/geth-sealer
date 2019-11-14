@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# export account to variable
+export account=$1
+echo "remove data $account from DynamoDB"
+
+# get list of authorized signers
+rm -rvf /home/signers
+geth --exec "clique.getSigners(console.log)" attach ipc:/hart/geth.ipc > /home/signers
+
+# check account on list of authorized signers
+if grep -c $account /home/signers > 0
+    then
+        echo $(date) "= that account NOT unvote yet, try again after more than half authorized signers unvote that account" 2>&1 | tee /hart/auth-signer.log
+    else
+        echo $(date) "= account unvoted" 2>&1 | tee /hart/auth-signer.log
+        
+        ## remove details from dynamoDB 
+        curl -H "Content-Type: text/plain" -X DELETE $(EMAIL_API)$account
+        curl -H "Content-Type: text/plain" -X DELETE $(STATIC_NODES_API)$account
+                
+        ## remove current static-nodes.json
+        rm -rvf /hart/geth/static-nodes.json
+        
+        ## recreate static-nodes.json and refresh enode list
+        echo "[" > /hart/geth/static-nodes.json
+        curl -H "Content-Type: text/plain" -X GET $(STATIC_NODES_API) | tr "_" "\n" | tr "-" "\n" | grep enode >> /hart/geth/static-nodes.json
+        sed -i 's/enode/"enode/g' /hart/geth/static-nodes.json && sed -i 's/30303/30303",/g' /hart/geth/static-nodes.json
+        sed -i '$ s/,//' hart/geth/static-nodes.json
+        echo "]" >> /hart/geth/static-nodes.json
+        
+        ## restart container
+        pkill geth
+fi

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+geth --exec "clique.propose('$1', false)" attach ipc:/hart/geth.ipc

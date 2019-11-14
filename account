@@ -1,0 +1,3 @@
+#!/bin/sh
+
+geth --exec "eth.accounts" attach ipc:/hart/geth.ipc
